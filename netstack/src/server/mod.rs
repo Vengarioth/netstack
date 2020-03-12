@@ -1,8 +1,8 @@
-mod connection;
-pub use connection::*;
+use crate::connection::*;
 use super::transport::{Transport, TransportError};
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use super::Buffer;
 
 mod configuration;
 pub use configuration::Configuration;
@@ -35,7 +35,7 @@ impl Server {
     pub fn update(&mut self) -> Vec<Event> {
         let mut poll_again = true; 
         let mut events = Vec::new();
-        let mut buffer: [u8; 1500] = [0; 1500];
+        let mut buffer: Buffer = [0; 1500];
         
         while poll_again {
             match self.transport.poll(&mut buffer) {
@@ -44,7 +44,7 @@ impl Server {
 
                         if let Some(connection) = self.address_to_id.get(&address) {
                             // connection exists, reset timeout and add event
-                            self.timeout.set(*connection, self.configuration.timeout).unwrap();
+                            self.timeout.set(*connection, self.configuration.timeout);
                             events.push(Event::Message {
                                 connection: connection.clone(),
                                 buffer,
@@ -54,8 +54,8 @@ impl Server {
                             // add connection, if a slot is free
                             if let Some(connection) = self.connections.create_connection() {
                                 self.address_to_id.insert(address, connection);
-                                self.timeout.set(connection, self.configuration.timeout).unwrap(); // TODO what to do with errors here?
-                                self.addresses.set(connection, address).unwrap();
+                                self.timeout.set(connection, self.configuration.timeout);
+                                self.addresses.set(connection, address);
                                 
                                 events.push(Event::Connected {
                                     connection: connection.clone(),
@@ -85,14 +85,15 @@ impl Server {
                 self.connections.delete_connection(connection).unwrap();
                 events.push(Event::Disconnected{ connection });
             } else {
-                self.timeout.set(connection, timeout - 1).unwrap();
+                self.timeout.set(connection, timeout - 1);
             }
         }
 
         events
     }
 
-    pub fn send(&mut self, address: &SocketAddr, buffer: &[u8]) -> Result<usize, TransportError> {
+    pub fn send(&mut self, buffer: &[u8], connection: Connection) -> Result<usize, TransportError> {
+        let address = self.addresses.get(connection).expect("TODO");
         self.transport.send(address, buffer)
     }
 }

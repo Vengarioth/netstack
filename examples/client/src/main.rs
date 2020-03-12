@@ -2,7 +2,11 @@
 extern crate netstack_derive;
 
 use netstack::{
-    client::Client,
+    client::{
+        Client,
+        Configuration,
+        Event,
+    },
     transport::UdpTransport,
     time::Clock,
 };
@@ -31,11 +35,34 @@ fn main() {
     let remote_address: SocketAddr = "127.0.0.1:9000".parse().unwrap();
     let transport = UdpTransport::new(local_address).unwrap();
 
-    let mut client = Client::new(Box::new(transport), remote_address);
+    let config = Configuration {
+        max_connections: 6,
+        timeout: 60
+    };
+
+    let mut client = Client::new(config, Box::new(transport));
+
+    let server = client.connect(remote_address).unwrap();
 
     loop {
         if clock.update() {
-            client.send(&[0x1, 0x2, 0x3, 0x4]).unwrap();
+            let events = client.update();
+
+            for event in events {
+                match event {
+                    Event::Connected { .. } => {
+                        println!("connected");
+                    },
+                    Event::Disconnected { .. } => {
+                        println!("disconnected");
+                    },
+                    Event::Message { .. } => {
+                        println!("message");
+                    }
+                }
+            }
+
+            client.send(&[0x1, 0x2, 0x3, 0x4], server).unwrap();
         }
     }
 }

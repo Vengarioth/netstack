@@ -138,6 +138,9 @@ impl<T> ConnectionDataList<T> {
 
     pub fn get(&self, connection: Connection) -> Option<&T> {
         let id = connection.id;
+        
+        // the generation needs to match the exact generation that was inserted
+        // so that a newer generation doesn't get old data
         if connection.generation != self.generations[id] {
             return None;
         }
@@ -148,15 +151,17 @@ impl<T> ConnectionDataList<T> {
         }
     }
 
-    pub fn set(&mut self, connection: Connection, item: T) -> Result<(), ()> {
+    pub fn set(&mut self, connection: Connection, item: T) {
         let id = connection.id;
+
+        // the generation needs to be greater or equal to the last inserted generation
+        // so that the current generation, as well as newer generations can override
+        // the value
         if connection.generation < self.generations[id] {
-            return Err(())
+            panic!("connection no longer alive")
         }
 
         self.generations[id] = connection.generation;
         self.items[id] = Some(item);
-
-        Ok(())
     }
 }
