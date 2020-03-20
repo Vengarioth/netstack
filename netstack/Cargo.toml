@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 failure = "0.1"
+hmac = "0.7"
+sha2 = "0.8"

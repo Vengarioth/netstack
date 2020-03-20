@@ -2,12 +2,16 @@ use crate::connection::*;
 use super::transport::{Transport, TransportError};
 use std::net::SocketAddr;
 use std::collections::HashMap;
+use crate::packets::RawPacket;
 
 mod configuration;
 pub use configuration::Configuration;
 
 mod event;
 pub use event::Event;
+
+use crate::security::Secret;
+use crate::packets::OutgoingPacket;
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum ConnectionState {
@@ -24,6 +28,7 @@ pub struct Client {
     addresses: ConnectionDataList<SocketAddr>,
     address_to_connection: HashMap<SocketAddr, Connection>,
     timeouts: ConnectionDataList<usize>,
+    secrets: ConnectionDataList<Secret>,
 }
 
 impl Client {
@@ -38,10 +43,11 @@ impl Client {
             addresses: ConnectionDataList::new(max_connections),
             address_to_connection: HashMap::new(),
             timeouts: ConnectionDataList::new(max_connections),
+            secrets: ConnectionDataList::new(max_connections),
         }
     }
 
-    pub fn connect(&mut self, remote_address: SocketAddr) -> Result<Connection, ()> {
+    pub fn connect(&mut self, remote_address: SocketAddr, secret: Secret) -> Result<Connection, ()> {
 
         if self.address_to_connection.contains_key(&remote_address) {
             return Err(());
@@ -52,6 +58,7 @@ impl Client {
         self.address_to_connection.insert(remote_address, connection);
         self.timeouts.set(connection, self.configuration.timeout);
         self.states.set(connection, ConnectionState::Connecting);
+        self.secrets.set(connection, secret);
 
         Ok(connection)
     }
@@ -59,26 +66,22 @@ impl Client {
     pub fn update(&mut self) -> Vec<Event> {
         let mut poll_again = true;
         let mut events = Vec::new();
-        let mut buffer: [u8; 1500] = [0; 1500];
-
+        
         while poll_again {
+            let mut buffer = [0; 1500];
             match self.transport.poll(&mut buffer) {
                 Ok(result) => {
                     if let Some((length, address)) = result {
-                        if let Some(connection) = self.address_to_connection.get(&address) {
-                            let connection = connection.clone();
-                            let state = self.states.get(connection).unwrap();
-                            if *state == ConnectionState::Connecting {
-                                self.states.set(connection, ConnectionState::Connected);
-                                events.push(Event::Connected { connection });
-                            }
+                        let packet = RawPacket::new(buffer, length);
 
-                            events.push(Event::Message {
-                                buffer,
-                                length,
-                                connection,
-                            });
-                            buffer = [0; 1500];
+                        let connection = if let Some(c) = self.address_to_connection.get(&address) {
+                            Some(*c)
+                        } else {
+                            None
+                        };
+
+                        if let Some(connection) = connection {
+                            self.handle_message(connection, packet, &mut events);
                         } else {
                             println!("packet from unknown source");
                         }
@@ -111,14 +114,42 @@ impl Client {
         events
     }
 
-    pub fn send(&mut self, buffer: &[u8], connection: Connection) -> Result<usize, TransportError> {
+    pub fn send(&mut self, packet: OutgoingPacket, connection: Connection) -> Result<usize, TransportError> {
         let state = self.states.get(connection).unwrap();
         if state == &ConnectionState::Disconnected {
             panic!("not connected");
         }
 
+        // TODO
+        let secret = self.secrets.get(connection).unwrap();
+        
+        let raw = packet.write_header_and_sign(0, 0, [0x0, 0x0, 0x0, 0x0], 0, secret);
+
         let address = self.addresses.get(connection).unwrap();
         println!("sending message to {}", address);
-        self.transport.send(address, buffer)
+        self.transport.send(address, raw.get_buffer())
+    }
+
+    fn handle_message(&mut self, connection: Connection, packet: RawPacket, events: &mut Vec<Event>) {
+
+        let secret = self.secrets.get(connection).unwrap();
+        if let Some(incoming) = packet.verify(secret) {
+
+            let state = self.states.get(connection).unwrap();
+            if *state == ConnectionState::Connecting {
+                self.states.set(connection, ConnectionState::Connected);
+                events.push(Event::Connected { connection });
+            }
+
+            self.timeouts.set(connection, self.configuration.timeout);
+
+            events.push(Event::Message {
+                connection,
+                payload: incoming.into_payload(),
+            });
+
+        } else {
+            println!("got invalid packet");
+        }
     }
 }

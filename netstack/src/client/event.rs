@@ -1,4 +1,7 @@
-use crate::connection::Connection;
+use crate::{
+    connection::Connection,
+    packets::Payload,
+};
 
 pub enum Event {
     Connected {
@@ -9,7 +12,6 @@ pub enum Event {
     },
     Message{
         connection: Connection,
-        buffer: [u8; 1500],
-        length: usize,
+        payload: Payload,
     }
 }
