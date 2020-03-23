@@ -6,7 +6,7 @@ A batteries included networking crate for games.
 
 ```
 [dependencies]
-netstack = "0.0.1"
+netstack = "0.1.1"
 ```
 
 ## requirements ❗
