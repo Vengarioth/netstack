@@ -51,6 +51,10 @@ impl RawPacket {
     }
 
     pub fn verify(self, secret: &Secret) -> Option<IncomingPacket> {
+        if self.length < HEADER_SIZE {
+            return None;
+        }
+
         let mut mac = HmacSha256::new_varkey(secret.get_bytes()).expect("HmacSha256 can take a key of any size");
         let body_length = self.get_header().body_length as usize;
 
