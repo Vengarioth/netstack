@@ -151,6 +151,21 @@ impl<T> ConnectionDataList<T> {
         }
     }
 
+    pub fn get_mut(&mut self, connection: Connection) -> Option<&mut T> {
+        let id = connection.id;
+
+        // the generation needs to match the exact generation that was inserted
+        // so that a newer generation doesn't get old data
+        if connection.generation != self.generations[id] {
+            return None;
+        }
+
+        match self.items[id] {
+            Some(ref mut item) => Some(item),
+            None => None,
+        }
+    }
+
     pub fn set(&mut self, connection: Connection, item: T) {
         let id = connection.id;
 
@@ -163,5 +178,17 @@ impl<T> ConnectionDataList<T> {
 
         self.generations[id] = connection.generation;
         self.items[id] = Some(item);
+    }
+
+    pub fn remove(&mut self, connection: Connection) -> Option<T> {
+        let id = connection.id;
+
+        // the generation needs to match the exact generation that was inserted
+        // so that a newer generation doesn't get old data
+        if connection.generation != self.generations[id] {
+            return None;
+        }
+
+        self.items[id].take()
     }
 }

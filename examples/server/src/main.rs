@@ -86,7 +86,7 @@ fn main() {
         match receiver.try_recv() {
             Ok((token, secret)) => {
                 println!("reserve connection");
-                server.reserve(secret);
+                server.reserve(secret, token);
             },
             _ => {},
         }

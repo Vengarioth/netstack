@@ -1,6 +1,6 @@
 const SECRET_SIZE: usize = 32;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Secret([u8; SECRET_SIZE]);
 
 impl Secret {

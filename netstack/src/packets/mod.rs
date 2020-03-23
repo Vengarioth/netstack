@@ -10,6 +10,38 @@ pub use incoming::*;
 pub use outgoing::*;
 pub use payload::*;
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum PacketType {
+    Connection,
+    Payload,
+    Heartbeat,
+    Disconnect,
+    Disconnected,
+}
+
+impl PacketType {
+    pub fn from_u8(value: u8) -> Option<Self> {
+        match value {
+            0 => Some(Self::Connection),
+            1 => Some(Self::Payload),
+            2 => Some(Self::Heartbeat),
+            3 => Some(Self::Disconnect),
+            4 => Some(Self::Disconnected),
+            _ => None,
+        }
+    }
+
+    pub fn to_u8(&self) -> u8 {
+        match self {
+            Self::Connection => 0,
+            Self::Payload => 1,
+            Self::Heartbeat => 2,
+            Self::Disconnect => 3,
+            Self::Disconnected => 4,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

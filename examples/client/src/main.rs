@@ -6,7 +6,10 @@ use netstack::{
     },
     transport::UdpTransport,
     time::Clock,
-    security::Secret,
+    security::{
+        Secret,
+        ConnectionToken
+    },
     packets::OutgoingPacket,
 };
 use std::net::SocketAddr;
@@ -42,7 +45,8 @@ fn main() {
 
     let config = Configuration {
         max_connections: 6,
-        timeout: 60
+        timeout: 60,
+        heartbeat: 6,
     };
 
     let mut client = Client::new(config, Box::new(transport));
@@ -50,8 +54,9 @@ fn main() {
     let connection_info = get_connection_info();
 
     let secret = Secret::from_slice(&connection_info.secret.from_base58().unwrap()).unwrap();
+    let connection_token = ConnectionToken::from_slice(&connection_info.token.from_base58().unwrap()).unwrap();
 
-    let server = client.connect(remote_address, secret).unwrap();
+    let server = client.connect(remote_address, secret, connection_token).unwrap();
 
     loop {
         if clock.update() {
