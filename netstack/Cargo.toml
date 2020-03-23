@@ -1,8 +1,12 @@
 [package]
 name = "netstack"
+description = "A batteries included networking crate for games."
+repository = "https://github.com/Vengarioth/netstack"
 version = "0.1.0"
-authors = ["Andreas Fischer <home@deviru.de>"]
+authors = ["Andreas Fischer <vengarioth@googlemail.com>"]
 edition = "2018"
+license = "MIT"
+keywords = ["gamedev", "netcode"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
