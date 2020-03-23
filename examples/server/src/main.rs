@@ -74,6 +74,7 @@ fn main() {
     let config = Configuration {
         max_connections: 64,
         timeout: 60,
+        heartbeat: 6,
         reserved_timeout: 120,
     };
 
@@ -85,8 +86,8 @@ fn main() {
     loop {
         match receiver.try_recv() {
             Ok((token, secret)) => {
-                println!("reserve connection");
-                server.reserve(secret, token);
+                let connection = server.reserve(secret, token).expect("could not reserve a slot");
+                println!("Reserved a slot for a client to connect to {}", connection);
             },
             _ => {},
         }
@@ -97,10 +98,10 @@ fn main() {
             for event in events {
                 match event {
                     Event::Connected { connection } => {
-                        println!("{} connected", connection);
+                        println!("A client connected to its slot {}", connection);
                     },
                     Event::Disconnected { connection } => {
-                        println!("{} disconnected", connection);
+                        println!("A client disconnected from its slot {}", connection);
                     },
                     Event::Message{ connection, payload } => {
                         println!("Message from {}", connection);

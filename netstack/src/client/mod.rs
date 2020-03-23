@@ -30,12 +30,12 @@ pub struct Client {
     connections: ConnectionList,
     states: ConnectionDataList<ConnectionState>,
     addresses: ConnectionDataList<SocketAddr>,
-    address_to_connection: HashMap<SocketAddr, Connection>,
     timeouts: ConnectionDataList<usize>,
     heartbeats: ConnectionDataList<usize>,
     sequence_numbers: ConnectionDataList<u64>,
     secrets: ConnectionDataList<Secret>,
     connection_tokens: ConnectionDataList<ConnectionToken>,
+    address_to_connection: HashMap<SocketAddr, Connection>,
 }
 
 impl Client {
@@ -48,12 +48,12 @@ impl Client {
             connections: ConnectionList::new(max_connections),
             states: ConnectionDataList::new(max_connections),
             addresses: ConnectionDataList::new(max_connections),
-            address_to_connection: HashMap::new(),
             timeouts: ConnectionDataList::new(max_connections),
             heartbeats: ConnectionDataList::new(max_connections),
             sequence_numbers: ConnectionDataList::new(max_connections),
             secrets: ConnectionDataList::new(max_connections),
             connection_tokens: ConnectionDataList::new(max_connections),
+            address_to_connection: HashMap::new(),
         }
     }
 
@@ -76,10 +76,10 @@ impl Client {
 
             self.send_connection_message(connection)?;
 
-            return Ok(connection);
+            Ok(connection)
 
         } else {
-            return Err(ClientError::MaximumConnectionsReached.into());
+            Err(ClientError::MaximumConnectionsReached.into())
         }
     }
 
@@ -211,26 +211,40 @@ impl Client {
             let state = self.states.get(connection).expect("State for connection not found").clone();
 
             if state == ConnectionState::Connecting {
-                
                 self.states.set(connection, ConnectionState::Connected);
                 self.timeouts.set(connection, self.configuration.timeout);
                 self.heartbeats.set(connection, self.configuration.heartbeat);
-
                 self.connection_tokens.remove(connection);
-                
+
                 events.push(Event::Connected { connection });
-                events.push(Event::Message {
-                    connection,
-                    payload: incoming.into_payload(),
-                });
+
+                if incoming.get_packet_type() == Some(PacketType::Payload) {
+                    events.push(Event::Message {
+                        connection,
+                        payload: incoming.into_payload(),
+                    });
+                }
             } else {
 
-                self.timeouts.set(connection, self.configuration.timeout);
+                match incoming.get_packet_type() {
+                    Some(PacketType::Payload) => {
+                        self.timeouts.set(connection, self.configuration.timeout);
 
-                events.push(Event::Message {
-                    connection,
-                    payload: incoming.into_payload(),
-                });
+                        events.push(Event::Message {
+                            connection,
+                            payload: incoming.into_payload(),
+                        });
+                    },
+                    Some(PacketType::Heartbeat) => {
+                        self.timeouts.set(connection, self.configuration.timeout);
+                    },
+                    Some(packet_type) => {
+                        println!("got unexpected packet type {:?}", packet_type);
+                    }
+                    _ => {
+                        println!("got invalid packet type");
+                    }
+                }
             }
         } else {
             println!("got invalid packet");

@@ -1,5 +1,5 @@
 use std::io::{self, Read};
-use super::{RawPacket, HEADER_SIZE, Payload};
+use super::{RawPacket, HEADER_SIZE, Payload, PacketType};
 
 pub struct IncomingPacket {
     buffer: RawPacket,
@@ -26,8 +26,8 @@ impl IncomingPacket {
         self.buffer.get_header().ack_bits.clone()
     }
 
-    pub fn get_packet_type(&self) -> u8 {
-        self.buffer.get_header().packet_type
+    pub fn get_packet_type(&self) -> Option<PacketType> {
+        PacketType::from_u8(self.buffer.get_header().packet_type)
     }
 
     pub fn get_body_length(&self) -> u16 {

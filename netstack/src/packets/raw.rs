@@ -43,11 +43,11 @@ impl RawPacket {
     }
 
     pub fn get_body(&self) -> &[u8] {
-        &self.buffer[HEADER_SIZE..self.length - HEADER_SIZE]
+        &self.buffer[HEADER_SIZE..self.length]
     }
 
     pub fn get_body_mut(&mut self) -> &mut [u8] {
-        &mut self.buffer[HEADER_SIZE..self.length - HEADER_SIZE]
+        &mut self.buffer[HEADER_SIZE..self.length]
     }
 
     pub fn verify(self, secret: &Secret) -> Option<IncomingPacket> {

@@ -60,7 +60,7 @@ mod tests {
 
         outgoing.write(&[0x1, 0x2, 0x3, 0x4, 0x5, 0x6]).expect("It writes into the buffer");
 
-        let buffer = outgoing.write_header_and_sign(15, 12, [0x3, 0x2, 0x1, 0x0], 1, &secret);
+        let buffer = outgoing.write_header_and_sign(15, 12, [0x3, 0x2, 0x1, 0x0], PacketType::Payload.to_u8(), &secret);
 
         let mut incoming = buffer.verify(&secret).expect("The verification succeeds");
 
@@ -71,7 +71,7 @@ mod tests {
         assert_eq!(incoming.get_sequence_number(), 15);
         assert_eq!(incoming.get_ack_sequence_number(), 12);
         assert_eq!(incoming.get_ack_bits(), [0x3, 0x2, 0x1, 0x0]);
-        assert_eq!(incoming.get_packet_type(), 1);
+        assert_eq!(incoming.get_packet_type(), Some(PacketType::Payload));
         assert_eq!(incoming.get_body_length(), 6);
     }
 

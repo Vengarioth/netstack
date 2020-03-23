@@ -1,12 +1,13 @@
 const CONNECTION_TOKEN_SIZE: usize = 32;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct ConnectionToken([u8; CONNECTION_TOKEN_SIZE]);
 
 impl ConnectionToken {
     pub fn from_slice(slice: &[u8]) -> Result<Self, ()> {
         if slice.len() != CONNECTION_TOKEN_SIZE {
-            panic!("TODO slice wrong size")
+            // TODO proper error
+            return Err(());
         }
 
         let mut bytes = [0; CONNECTION_TOKEN_SIZE];

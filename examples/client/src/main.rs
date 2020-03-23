@@ -58,6 +58,7 @@ fn main() {
 
     let server = client.connect(remote_address, secret, connection_token).unwrap();
 
+    let mut connected = false;
     loop {
         if clock.update() {
             let events = client.update();
@@ -65,21 +66,25 @@ fn main() {
             for event in events {
                 match event {
                     Event::Connected { .. } => {
-                        println!("connected");
+                        connected = true;
+                        println!("connected to a server");
                     },
                     Event::Disconnected { .. } => {
-                        println!("disconnected");
+                        connected = false;
+                        println!("disconnected from a server");
                     },
                     Event::Message { .. } => {
-                        println!("message");
+                        println!("got a message from a server");
                     }
                 }
             }
-
-            let mut packet = OutgoingPacket::new();
-            packet.write(&[0x1, 0x2, 0x3, 0x4]).unwrap();
-
-            client.send(packet, server).unwrap();
+            
+            if connected {
+                let mut packet = OutgoingPacket::new();
+                packet.write(&[0x1, 0x2, 0x3, 0x4]).unwrap();
+                
+                // client.send(packet, server).unwrap();
+            }
         }
     }
 }
