@@ -2,11 +2,12 @@
 name = "netstack"
 description = "A batteries included networking crate for games."
 repository = "https://github.com/Vengarioth/netstack"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Andreas Fischer <vengarioth@googlemail.com>"]
 edition = "2018"
 license = "MIT"
 keywords = ["gamedev", "netcode"]
+readme = "../readme.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
