@@ -1,41 +1,90 @@
-#[macro_use]
-extern crate netstack_derive;
-
 use netstack::{
-    client::Client,
+    client::{
+        Client,
+        Configuration,
+        Event,
+    },
     transport::UdpTransport,
     time::Clock,
+    security::{
+        Secret,
+        ConnectionToken
+    },
+    packets::OutgoingPacket,
 };
 use std::net::SocketAddr;
 use std::time::Duration;
+use std::io::Write;
+use serde::{Deserialize, Serialize};
+use base58::FromBase58;
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Greeting {
-    pub id: u32,
-    pub to: String,
-    pub message: String,
+#[derive(Serialize, Deserialize)]
+pub struct ConnectionInfo {
+    token: String,
+    secret: String,
+}
+
+fn get_connection_info() -> ConnectionInfo {
+    let response = ureq::get("http://127.0.0.1:8000/").call();
+
+    if !response.ok() {
+        panic!("could not get a secret from the remote server");
+    }
+
+    let data = response.into_string().unwrap();
+
+    serde_json::from_str(&data).unwrap()
 }
 
 fn main() {
     let mut clock = Clock::new(Duration::from_millis(16));
 
-    let greeting = Greeting {
-        id: 42,
-        to: "world".to_owned(),
-        message: "hello world!".to_owned(),
-    };
-
-    dbg!(greeting);
-
     let local_address: SocketAddr = "127.0.0.1:0".parse().unwrap();
     let remote_address: SocketAddr = "127.0.0.1:9000".parse().unwrap();
     let transport = UdpTransport::new(local_address).unwrap();
 
-    let mut client = Client::new(Box::new(transport), remote_address);
+    let config = Configuration {
+        max_connections: 6,
+        timeout: 60,
+        heartbeat: 6,
+    };
 
+    let mut client = Client::new(config, Box::new(transport));
+
+    let connection_info = get_connection_info();
+
+    let secret = Secret::from_slice(&connection_info.secret.from_base58().unwrap()).unwrap();
+    let connection_token = ConnectionToken::from_slice(&connection_info.token.from_base58().unwrap()).unwrap();
+
+    let server = client.connect(remote_address, secret, connection_token).unwrap();
+
+    let mut connected = false;
     loop {
         if clock.update() {
-            client.send(&[0x1, 0x2, 0x3, 0x4]).unwrap();
+            let events = client.update();
+
+            for event in events {
+                match event {
+                    Event::Connected { .. } => {
+                        connected = true;
+                        println!("connected to a server");
+                    },
+                    Event::Disconnected { .. } => {
+                        connected = false;
+                        println!("disconnected from a server");
+                    },
+                    Event::Message { .. } => {
+                        println!("got a message from a server");
+                    }
+                }
+            }
+            
+            if connected {
+                let mut packet = OutgoingPacket::new();
+                packet.write(&[0x1, 0x2, 0x3, 0x4]).unwrap();
+                
+                // client.send(packet, server).unwrap();
+            }
         }
     }
 }

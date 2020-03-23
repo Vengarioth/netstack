@@ -1,9 +1,17 @@
-use std::net::SocketAddr;
+use crate::{
+    connection::Connection,
+    packets::Payload,
+};
 
 pub enum Event {
+    Connected {
+        connection: Connection,
+    },
+    Disconnected {
+        connection: Connection,
+    },
     Message{
-        buffer: [u8; 1500],
-        length: usize,
-        address: SocketAddr,
+        connection: Connection,
+        payload: Payload,
     }
 }

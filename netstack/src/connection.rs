@@ -1,4 +1,5 @@
 use std::fmt;
+use std::collections::VecDeque;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Connection {
@@ -23,17 +24,17 @@ impl fmt::Display for Connection {
 
 pub struct ConnectionList {
     connections: Vec<Connection>,
-    empty: Vec<usize>,
+    empty: VecDeque<usize>,
 }
 
 impl ConnectionList {
     pub fn new(size: usize) -> Self {
 
         let mut connections = Vec::with_capacity(size);
-        let mut empty = Vec::with_capacity(size);
+        let mut empty = VecDeque::with_capacity(size);
         for i in 0..size {
             connections.push(Connection::new(i, 0));
-            empty.push(i);
+            empty.push_back(i);
         }
 
         Self {
@@ -54,7 +55,7 @@ impl ConnectionList {
 
     pub fn create_connection(&mut self) -> Option<Connection> {
 
-        let id = self.empty.pop()?;
+        let id = self.empty.pop_front()?;
 
         let old_connection = self.connections[id];
         let new_connection = Connection::new(id, old_connection.generation + 1);
@@ -75,7 +76,7 @@ impl ConnectionList {
 
         let new_connection = Connection::new(id, old_connection.generation + 1);
         self.connections[id] = new_connection;
-        self.empty.push(id);
+        self.empty.push_back(id);
 
         Ok(())
     }
@@ -138,6 +139,9 @@ impl<T> ConnectionDataList<T> {
 
     pub fn get(&self, connection: Connection) -> Option<&T> {
         let id = connection.id;
+        
+        // the generation needs to match the exact generation that was inserted
+        // so that a newer generation doesn't get old data
         if connection.generation != self.generations[id] {
             return None;
         }
@@ -148,15 +152,44 @@ impl<T> ConnectionDataList<T> {
         }
     }
 
-    pub fn set(&mut self, connection: Connection, item: T) -> Result<(), ()> {
+    pub fn get_mut(&mut self, connection: Connection) -> Option<&mut T> {
         let id = connection.id;
+
+        // the generation needs to match the exact generation that was inserted
+        // so that a newer generation doesn't get old data
+        if connection.generation != self.generations[id] {
+            return None;
+        }
+
+        match self.items[id] {
+            Some(ref mut item) => Some(item),
+            None => None,
+        }
+    }
+
+    pub fn set(&mut self, connection: Connection, item: T) {
+        let id = connection.id;
+
+        // the generation needs to be greater or equal to the last inserted generation
+        // so that the current generation, as well as newer generations can override
+        // the value
         if connection.generation < self.generations[id] {
-            return Err(())
+            panic!("connection no longer alive")
         }
 
         self.generations[id] = connection.generation;
         self.items[id] = Some(item);
+    }
 
-        Ok(())
+    pub fn remove(&mut self, connection: Connection) -> Option<T> {
+        let id = connection.id;
+
+        // the generation needs to match the exact generation that was inserted
+        // so that a newer generation doesn't get old data
+        if connection.generation != self.generations[id] {
+            return None;
+        }
+
+        self.items[id].take()
     }
 }
