@@ -2,7 +2,7 @@
 name = "netstack"
 description = "A batteries included networking crate for games."
 repository = "https://github.com/Vengarioth/netstack"
-version = "0.1.1"
+version = "0.2.0"
 authors = ["Andreas Fischer <vengarioth@googlemail.com>"]
 edition = "2018"
 license = "MIT"
@@ -15,3 +15,4 @@ readme = "../readme.md"
 failure = "0.1"
 hmac = "0.7"
 sha2 = "0.8"
+bitvec = "0.17"

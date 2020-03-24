@@ -73,9 +73,9 @@ fn main() {
 
     let config = Configuration {
         max_connections: 64,
-        timeout: 60,
-        heartbeat: 6,
-        reserved_timeout: 120,
+        timeout: 120,
+        heartbeat: 60,
+        reserved_timeout: 600,
     };
 
     let mut server = Server::new(config, Box::new(transport));
@@ -109,8 +109,12 @@ fn main() {
                         let mut packet = OutgoingPacket::new();
                         packet.write(payload.get_buffer()).unwrap();
 
-                        server.send(packet, connection).unwrap();
-                    }
+                        let sequence_number = server.send(packet, connection).unwrap();
+                        println!("Sent Message {} to client {}", sequence_number, connection);
+                    },
+                    Event::MessageAcknowledged{ connection, sequence_number } => {
+                        println!("Message {} sent to {} got acknowledged", sequence_number, connection);
+                    },
                 }
             }
         }

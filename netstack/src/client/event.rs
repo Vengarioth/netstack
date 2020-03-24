@@ -10,8 +10,12 @@ pub enum Event {
     Disconnected {
         connection: Connection,
     },
-    Message{
+    Message {
         connection: Connection,
         payload: Payload,
-    }
+    },
+    MessageAcknowledged {
+        connection: Connection,
+        sequence_number: u64,
+    },
 }

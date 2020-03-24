@@ -37,7 +37,7 @@ fn get_connection_info() -> ConnectionInfo {
 }
 
 fn main() {
-    let mut clock = Clock::new(Duration::from_millis(16));
+    let mut clock = Clock::new(Duration::from_millis(100));
 
     let local_address: SocketAddr = "127.0.0.1:0".parse().unwrap();
     let remote_address: SocketAddr = "127.0.0.1:9000".parse().unwrap();
@@ -45,8 +45,8 @@ fn main() {
 
     let config = Configuration {
         max_connections: 6,
-        timeout: 60,
-        heartbeat: 6,
+        timeout: 120,
+        heartbeat: 60,
     };
 
     let mut client = Client::new(config, Box::new(transport));
@@ -75,7 +75,10 @@ fn main() {
                     },
                     Event::Message { .. } => {
                         println!("got a message from a server");
-                    }
+                    },
+                    Event::MessageAcknowledged{ connection, sequence_number } => {
+                        println!("Message {} sent to {} got acknowledged", sequence_number, connection);
+                    },
                 }
             }
             
@@ -83,7 +86,8 @@ fn main() {
                 let mut packet = OutgoingPacket::new();
                 packet.write(&[0x1, 0x2, 0x3, 0x4]).unwrap();
                 
-                // client.send(packet, server).unwrap();
+                let sequence_number = client.send(packet, server).unwrap();
+                println!("Sent Message {} to server", sequence_number);
             }
         }
     }

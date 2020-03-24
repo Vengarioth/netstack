@@ -23,7 +23,7 @@ The sequence number is used to perform acknowledgements and also acts as a [nonc
 
 ### Ack Sequence Number
 
-The highest known sequence number the sending party received from the remote party. This is used to acknowledge messages.
+The highest known sequence number **+ 1** the sending party received from the remote party. This is used to acknowledge messages. This will change in the future with a more elegant implementation.
 
 ### Ack Bits
 
@@ -33,13 +33,13 @@ This field is used to acknowledge the following 32 sequence numbers after the `A
 
 A number specifying the type of the packet as follows:
 
-| Number | Packet Type               |
-|--------|---------------------------|
-| 0      | Connection Attempt Packet |
-| 1      | Payload Packet            |
-| 2      | Heartbeat Packet          |
-| 3      | Disconnect Packet         |
-| 4      | Payload Packet            |
+| Number | Packet Type         |
+|--------|---------------------|
+| 0      | Connection Packet   |
+| 1      | Payload Packet      |
+| 2      | Heartbeat Packet    |
+| 3      | Disconnect Packet   |
+| 4      | Disconnected Packet |
 
 ### Body Length
 
