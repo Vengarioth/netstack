@@ -14,7 +14,7 @@ pub use event::Event;
 mod error;
 pub use error::ClientError;
 
-use crate::security::{Secret, ConnectionToken};
+use crate::security::{Secret, ConnectionToken, ReplayBuffer};
 use crate::packets::{OutgoingPacket, PacketType};
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -34,6 +34,8 @@ pub struct Client {
     heartbeats: ConnectionDataList<usize>,
     sequence_numbers: ConnectionDataList<u64>,
     secrets: ConnectionDataList<Secret>,
+    replay_buffers: ConnectionDataList<ReplayBuffer>,
+    ack_buffers: ConnectionDataList<ReplayBuffer>,
     connection_tokens: ConnectionDataList<ConnectionToken>,
     address_to_connection: HashMap<SocketAddr, Connection>,
 }
@@ -52,6 +54,8 @@ impl Client {
             heartbeats: ConnectionDataList::new(max_connections),
             sequence_numbers: ConnectionDataList::new(max_connections),
             secrets: ConnectionDataList::new(max_connections),
+            replay_buffers: ConnectionDataList::new(max_connections),
+            ack_buffers: ConnectionDataList::new(max_connections),
             connection_tokens: ConnectionDataList::new(max_connections),
             address_to_connection: HashMap::new(),
         }
@@ -72,6 +76,8 @@ impl Client {
             self.sequence_numbers.set(connection, 0);
             self.states.set(connection, ConnectionState::Connecting);
             self.secrets.set(connection, secret);
+            self.replay_buffers.set(connection, ReplayBuffer::new());
+            self.ack_buffers.set(connection, ReplayBuffer::new());
             self.connection_tokens.set(connection, connection_token);
 
             self.send_connection_message(connection)?;
@@ -157,7 +163,8 @@ impl Client {
         events
     }
 
-    pub fn send(&mut self, packet: OutgoingPacket, connection: Connection) -> Result<(), Error> {
+    /// Sends a packet to the given connection and returns the packet's sequence number
+    pub fn send(&mut self, packet: OutgoingPacket, connection: Connection) -> Result<u64, Error> {
         match self.get_connection_state(connection) {
             Some(ConnectionState::Connected) => {
                 Ok(self.send_internal(packet, connection, PacketType::Payload)?)
@@ -174,12 +181,14 @@ impl Client {
         }
     }
 
-    fn send_internal(&mut self, packet: OutgoingPacket, connection: Connection, packet_type: PacketType) -> Result<(), Error> {
+    fn send_internal(&mut self, packet: OutgoingPacket, connection: Connection, packet_type: PacketType) -> Result<u64, Error> {
         let sequence_number = self.sequence_numbers.get(connection).expect("No sequence number for connection found") + 1;
         self.sequence_numbers.set(connection, sequence_number);
         let secret = self.secrets.get(connection).expect("No secret for connection found");
 
-        let raw = packet.write_header_and_sign(sequence_number, 0, [0x0, 0x0, 0x0, 0x0], packet_type.to_u8(), secret);
+        let (ack_sequence_number, ack_bits) = self.replay_buffers.get(connection).expect("no replay buffer for connection").get_ack_bits();
+
+        let raw = packet.write_header_and_sign(sequence_number, ack_sequence_number, ack_bits, packet_type.to_u8(), secret);
         let address = self.addresses.get(connection).expect("No address for connection found");
 
         // TODO check bytes sent?
@@ -187,7 +196,7 @@ impl Client {
 
         self.heartbeats.set(connection, self.configuration.heartbeat);
 
-        Ok(())
+        Ok(sequence_number)
     }
 
     fn find_connection(&self, address: &SocketAddr) -> Option<Connection> {
@@ -210,41 +219,61 @@ impl Client {
         if let Some(incoming) = packet.verify(secret) {
             let state = self.states.get(connection).expect("State for connection not found").clone();
 
-            if state == ConnectionState::Connecting {
-                self.states.set(connection, ConnectionState::Connected);
-                self.timeouts.set(connection, self.configuration.timeout);
-                self.heartbeats.set(connection, self.configuration.heartbeat);
-                self.connection_tokens.remove(connection);
+            let sequence_number = incoming.get_sequence_number();
+            let replay_buffer = self.replay_buffers.get_mut(connection).expect("No replay buffer for connection");
 
-                events.push(Event::Connected { connection });
+            if replay_buffer.acknowledge(sequence_number) {
+                let ack_sequence_number = incoming.get_ack_sequence_number();
+                let ack_bits = incoming.get_ack_bits();
 
-                if incoming.get_packet_type() == Some(PacketType::Payload) {
-                    events.push(Event::Message {
+                let ack_buffer = self.ack_buffers.get_mut(connection).expect("no replay buffer for connection");
+                let acked = ack_buffer.set_ack_bits(ack_sequence_number, ack_bits);
+
+                for sequence_number in acked {
+                    events.push(Event::MessageAcknowledged {
                         connection,
-                        payload: incoming.into_payload(),
+                        sequence_number,
                     });
                 }
-            } else {
 
-                match incoming.get_packet_type() {
-                    Some(PacketType::Payload) => {
-                        self.timeouts.set(connection, self.configuration.timeout);
+                if state == ConnectionState::Connecting {
+                    self.states.set(connection, ConnectionState::Connected);
+                    self.timeouts.set(connection, self.configuration.timeout);
+                    self.heartbeats.set(connection, self.configuration.heartbeat);
+                    self.connection_tokens.remove(connection);
 
+                    events.push(Event::Connected { connection });
+
+                    if incoming.get_packet_type() == Some(PacketType::Payload) {
                         events.push(Event::Message {
                             connection,
                             payload: incoming.into_payload(),
                         });
-                    },
-                    Some(PacketType::Heartbeat) => {
-                        self.timeouts.set(connection, self.configuration.timeout);
-                    },
-                    Some(packet_type) => {
-                        println!("got unexpected packet type {:?}", packet_type);
                     }
-                    _ => {
-                        println!("got invalid packet type");
+                } else {
+
+                    match incoming.get_packet_type() {
+                        Some(PacketType::Payload) => {
+                            self.timeouts.set(connection, self.configuration.timeout);
+
+                            events.push(Event::Message {
+                                connection,
+                                payload: incoming.into_payload(),
+                            });
+                        },
+                        Some(PacketType::Heartbeat) => {
+                            self.timeouts.set(connection, self.configuration.timeout);
+                        },
+                        Some(packet_type) => {
+                            println!("got unexpected packet type {:?}", packet_type);
+                        }
+                        _ => {
+                            println!("got invalid packet type");
+                        }
                     }
                 }
+            } else {
+                println!("got packet with unusable sequence number");
             }
         } else {
             println!("got invalid packet");
