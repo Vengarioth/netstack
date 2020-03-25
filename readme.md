@@ -9,7 +9,7 @@ A batteries included networking crate for games.
 netstack = "0.2.0"
 ```
 
-## docks.rs 🗎
+## docs.rs 🗎
 
 [Documentation (work in progress)](https://docs.rs/netstack/)
 
