@@ -14,6 +14,7 @@ use netstack::{
     },
     packets::OutgoingPacket,
 };
+use netstack_prometheus::PrometheusMonitor;
 use std::io::Write;
 use std::thread;
 use serde::{Deserialize, Serialize};
@@ -78,7 +79,8 @@ fn main() {
         reserved_timeout: 600,
     };
 
-    let mut server = Server::new(config, Box::new(transport));
+    let monitor = PrometheusMonitor::new();
+    let mut server = Server::new(config, Box::new(transport), Box::new(monitor));
 
     let (sender, receiver) = sync_channel(2);
     run_webserver(Arc::new(sender));

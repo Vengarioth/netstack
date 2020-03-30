@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use crate::packets::{RawPacket, OutgoingPacket, PacketType};
 use crate::security::{Secret, ConnectionToken, ReplayBuffer};
+use crate::monitoring::Monitor;
 
 mod configuration;
 pub use configuration::Configuration;
@@ -36,10 +37,12 @@ pub struct Server {
     ack_buffers: ConnectionDataList<ReplayBuffer>,
     connection_token_to_connection: HashMap<ConnectionToken, Connection>,
     address_to_connection: HashMap<SocketAddr, Connection>,
+
+    monitor: Box<dyn Monitor>,
 }
 
 impl Server {
-    pub fn new(configuration: Configuration, transport: Box<dyn Transport>) -> Self {
+    pub fn new(configuration: Configuration, transport: Box<dyn Transport>, monitor: Box<dyn Monitor>) -> Self {
         let max_connections = configuration.max_connections;
         Self {
             transport,
@@ -55,6 +58,7 @@ impl Server {
             ack_buffers: ConnectionDataList::new(max_connections),
             connection_token_to_connection: HashMap::new(),
             address_to_connection: HashMap::new(),
+            monitor,
         }
     }
 
@@ -84,6 +88,7 @@ impl Server {
     }
 
     pub fn update(&mut self) -> Vec<Event> {
+        self.monitor.tick();
         let mut poll_again = true; 
         let mut events = Vec::new();
 

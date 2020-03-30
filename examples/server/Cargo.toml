@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 netstack = { path = "../../netstack" }
 netstack_derive = { path = "../../netstack_derive" }
+netstack_prometheus = { path = "../../netstack_prometheus" }
 simple-server = "0.4"
 base58 = "0.1"
 rand = "0.7"
