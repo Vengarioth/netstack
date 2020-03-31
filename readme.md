@@ -13,6 +13,10 @@ netstack = "0.2.0"
 
 [Documentation (work in progress)](https://docs.rs/netstack/)
 
+## getting in touch 💬
+
+If you have suggestions, miss features or just want to get in touch, you can open issues in this repository or get a hold of me on [twitter](https://twitter.com/vengarioth).
+
 ## requirements ❗
 
 To effectively use netstack in production you need a secure channel to exchange an initial secret and connection token. It is recommended to use https for this, but it's up to you. The examples use a http server.
@@ -34,7 +38,7 @@ To effectively use netstack in production you need a secure channel to exchange 
 
 ### Event based I/O
 
-Transports based on `io_uring`, `IOCP` or `epoll` are out of scope for me right now.
+Transports based on `io_uring`, `IOCP` or `epoll` are out of scope right now.
 
 ### Reliable Transmission
 
