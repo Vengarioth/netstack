@@ -46,21 +46,36 @@ fn run_webserver(sender: Arc<SyncSender<(ConnectionToken, Secret)>>) {
     use base58::ToBase58;
 
     thread::spawn(move || {
-        let webserver = WebServer::new(move |_, mut response| {
-            let token = generate_connection_token();
-            let secret = generate_secret();
+        let webserver = WebServer::new(move |request, mut response| {
 
-            let token_string = token.get_bytes().to_base58();
-            let secret_string = secret.get_bytes().to_base58();
+            match request.uri().path() {
+                "/token" => {
+                    let token = generate_connection_token();
+                    let secret = generate_secret();
 
-            let info = ConnectionInfo {
-                token: token_string,
-                secret: secret_string,
-            };
-            let send_info = serde_json::to_string(&info).unwrap();
-            sender.send((token, secret)).unwrap();
+                    let token_string = token.get_bytes().to_base58();
+                    let secret_string = secret.get_bytes().to_base58();
 
-            Ok(response.body(send_info.as_bytes().to_vec())?)
+                    let info = ConnectionInfo {
+                        token: token_string,
+                        secret: secret_string,
+                    };
+                    let send_info = serde_json::to_string(&info).unwrap();
+                    sender.send((token, secret)).unwrap();
+
+                    Ok(response.body(send_info.as_bytes().to_vec())?)
+                },
+                "/metrics" => {
+                    let body = PrometheusMonitor::render();
+                    Ok(response.body(body)?)
+                },
+                "/" => {
+                    Ok(response.body("Hello World!".as_bytes().to_vec())?)
+                },
+                _ => {
+                    Ok(response.status(404).body("Not Found".as_bytes().to_vec())?)
+                },
+            }
         });
     
         webserver.listen("127.0.0.1", "8000");

@@ -1,43 +1,47 @@
-use netstack::monitoring::Monitor;
-use prometheus::{Opts, Registry, Counter, TextEncoder, Encoder, IntCounter, register_int_counter};
+use netstack::monitoring::ServerMonitor;
+use prometheus::{TextEncoder, Encoder};
 
 lazy_static::lazy_static! {
-    static ref A_INT_COUNTER: IntCounter =
-        register_int_counter!("A_int_counter", "foobar").unwrap();
+    static ref TICKS: prometheus::IntCounter = prometheus::register_int_counter!("ticks", "Total ticks elapsed since the server was started").unwrap();
+    static ref CONNECTED: prometheus::IntCounter = prometheus::register_int_counter!("connected", "total number of connected events").unwrap();
+    static ref DISCONNECTED: prometheus::IntCounter = prometheus::register_int_counter!("disconnected", "total number of disconnected events").unwrap();
+    static ref MESSAGES: prometheus::IntCounter = prometheus::register_int_counter!("messages", "total number of received messages").unwrap();
 }
 
-pub struct PrometheusMonitor {
-    registry: Registry,
-    ticks: Counter,
-}
+pub struct PrometheusMonitor;
 
 impl PrometheusMonitor {
     pub fn new() -> Self {
-        let registry = Registry::new();
-        let ticks = Counter::with_opts(Opts::new("ticks", "Number of ticks since start")).unwrap();
 
-        registry.register(Box::new(ticks.clone())).unwrap();
-
-        Self {
-            registry,
-            ticks,
-        }
+        Self
     }
 
-    pub fn render(&self) {
-        let encoder = TextEncoder::new();
-        let metric_families = self.registry.gather();
+    pub fn render() -> Vec<u8> {
+        let metric_families = prometheus::gather();
 
+        let encoder = TextEncoder::new();
         let mut buffer = vec![];
         encoder.encode(&metric_families, &mut buffer).unwrap();
 
-        println!("{}", String::from_utf8(buffer).unwrap());
+        buffer
     }
 }
 
-impl Monitor for PrometheusMonitor {
+impl ServerMonitor for PrometheusMonitor {
     fn tick(&mut self) {
-        self.ticks.inc();
+        TICKS.inc();
+    }
+
+    fn connected(&mut self) {
+        CONNECTED.inc();
+    }
+
+    fn disconnected(&mut self) {
+        DISCONNECTED.inc();
+    }
+
+    fn message(&mut self) {
+        MESSAGES.inc();
     }
 }
 

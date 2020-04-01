@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use crate::packets::{RawPacket, OutgoingPacket, PacketType};
 use crate::security::{Secret, ConnectionToken, ReplayBuffer};
-use crate::monitoring::Monitor;
+use crate::monitoring::ServerMonitor;
 
 mod configuration;
 pub use configuration::Configuration;
@@ -38,11 +38,11 @@ pub struct Server {
     connection_token_to_connection: HashMap<ConnectionToken, Connection>,
     address_to_connection: HashMap<SocketAddr, Connection>,
 
-    monitor: Box<dyn Monitor>,
+    monitor: Box<dyn ServerMonitor>,
 }
 
 impl Server {
-    pub fn new(configuration: Configuration, transport: Box<dyn Transport>, monitor: Box<dyn Monitor>) -> Self {
+    pub fn new(configuration: Configuration, transport: Box<dyn Transport>, monitor: Box<dyn ServerMonitor>) -> Self {
         let max_connections = configuration.max_connections;
         Self {
             transport,
@@ -130,6 +130,7 @@ impl Server {
 
                 self.connections.delete_connection(connection).unwrap();
                 events.push(Event::Disconnected { connection });
+                self.monitor.disconnected();
                 continue;
             } else {
                 self.timeouts.set(connection, timeout);
@@ -268,6 +269,7 @@ impl Server {
         events.push(Event::Connected {
             connection,
         });
+        self.monitor.connected();
     }
 
     fn handle_message(&mut self, connection: Connection, packet: RawPacket, events: &mut Vec<Event>) {
@@ -301,6 +303,7 @@ impl Server {
                             connection,
                             payload: packet.into_payload(),
                         });
+                        self.monitor.message();
                     },
                     Some(PacketType::Heartbeat) => {
                         self.timeouts.set(connection, self.configuration.timeout);
