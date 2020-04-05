@@ -16,6 +16,7 @@ pub use error::ClientError;
 
 use crate::security::{Secret, ConnectionToken, ReplayBuffer};
 use crate::packets::{OutgoingPacket, PacketType};
+use crate::monitoring::ClientMonitor;
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum ConnectionState {
@@ -38,10 +39,11 @@ pub struct Client {
     ack_buffers: ConnectionDataList<ReplayBuffer>,
     connection_tokens: ConnectionDataList<ConnectionToken>,
     address_to_connection: HashMap<SocketAddr, Connection>,
+    monitor: Box<dyn ClientMonitor>,
 }
 
 impl Client {
-    pub fn new(configuration: Configuration, transport: Box<dyn Transport>) -> Self {
+    pub fn new(configuration: Configuration, transport: Box<dyn Transport>, monitor: Box<dyn ClientMonitor>) -> Self {
         let max_connections = configuration.max_connections;
 
         Self {
@@ -58,6 +60,7 @@ impl Client {
             ack_buffers: ConnectionDataList::new(max_connections),
             connection_tokens: ConnectionDataList::new(max_connections),
             address_to_connection: HashMap::new(),
+            monitor,
         }
     }
 
@@ -82,6 +85,8 @@ impl Client {
 
             self.send_connection_message(connection)?;
 
+            self.monitor.connecting();
+
             Ok(connection)
 
         } else {
@@ -92,6 +97,8 @@ impl Client {
     pub fn update(&mut self) -> Vec<Event> {
         let mut poll_again = true;
         let mut events = Vec::new();
+
+        self.monitor.tick();
         
         while poll_again {
             let mut buffer = [0; 1500];
@@ -132,6 +139,7 @@ impl Client {
                 self.connection_tokens.remove(connection);
 
                 self.connections.delete_connection(connection).unwrap();
+                self.monitor.disconnected();
                 events.push(Event::Disconnected { connection });
                 continue;
 
@@ -195,6 +203,7 @@ impl Client {
         let _bytes_sent = self.transport.send(address, raw.get_buffer())?;
 
         self.heartbeats.set(connection, self.configuration.heartbeat);
+        self.monitor.message_sent();
 
         Ok(sequence_number)
     }
@@ -230,6 +239,7 @@ impl Client {
                 let acked = ack_buffer.set_ack_bits(ack_sequence_number, ack_bits);
 
                 for sequence_number in acked {
+                    self.monitor.message_acknowledged();
                     events.push(Event::MessageAcknowledged {
                         connection,
                         sequence_number,
@@ -242,9 +252,11 @@ impl Client {
                     self.heartbeats.set(connection, self.configuration.heartbeat);
                     self.connection_tokens.remove(connection);
 
+                    self.monitor.connected();
                     events.push(Event::Connected { connection });
 
                     if incoming.get_packet_type() == Some(PacketType::Payload) {
+                        self.monitor.message_received();
                         events.push(Event::Message {
                             connection,
                             payload: incoming.into_payload(),
@@ -256,6 +268,7 @@ impl Client {
                         Some(PacketType::Payload) => {
                             self.timeouts.set(connection, self.configuration.timeout);
 
+                            self.monitor.message_received();
                             events.push(Event::Message {
                                 connection,
                                 payload: incoming.into_payload(),

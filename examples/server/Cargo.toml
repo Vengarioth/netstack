@@ -1,7 +1,7 @@
 [package]
 name = "server"
-version = "0.1.0"
-authors = ["Andreas Fischer <home@deviru.de>"]
+version = "0.3.0"
+authors = ["Andreas Fischer <vengarioth@googlemail.com>"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 netstack = { path = "../../netstack" }
 netstack_derive = { path = "../../netstack_derive" }
+netstack_prometheus = { path = "../../netstack_prometheus" }
 simple-server = "0.4"
 base58 = "0.1"
 rand = "0.7"

@@ -1,5 +1,5 @@
 [package]
-name = "client"
+name = "netstack_prometheus"
 version = "0.3.0"
 authors = ["Andreas Fischer <vengarioth@googlemail.com>"]
 edition = "2018"
@@ -7,9 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-netstack = { path = "../../netstack" }
-netstack_derive = { path = "../../netstack_derive" }
-ureq = "0.12"
-base58 = "0.1"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+netstack = { path = "../netstack" }
+prometheus = "0.8"
+lazy_static = "1.4"

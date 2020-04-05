@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.0] Basic Monitoring
+
+* added `ClientMonitor` and `ServerMonitor` traits
+* added basic functionality for monitors
+* added `netstack_prometheus` as an work-in-progress prometheus exporter for netstack
+
 ## [0.2.0] Package acknowledgements
 
 * receive acks for sequence numbers
