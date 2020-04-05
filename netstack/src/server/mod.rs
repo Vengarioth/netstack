@@ -80,6 +80,8 @@ impl Server {
             self.ack_buffers.set(connection, ReplayBuffer::new());
             self.connection_token_to_connection.insert(connection_token, connection);
 
+            self.monitor.reserved();
+
             Ok(connection)
 
         } else {
@@ -129,8 +131,8 @@ impl Server {
                 self.secrets.remove(connection);
 
                 self.connections.delete_connection(connection).unwrap();
-                events.push(Event::Disconnected { connection });
                 self.monitor.disconnected();
+                events.push(Event::Disconnected { connection });
                 continue;
             } else {
                 self.timeouts.set(connection, timeout);
@@ -180,6 +182,7 @@ impl Server {
         let _bytes_sent = self.transport.send(address, raw.get_buffer())?;
 
         self.heartbeats.set(connection, self.configuration.heartbeat);
+        self.monitor.message_sent();
 
         Ok(sequence_number)
     }
@@ -251,6 +254,7 @@ impl Server {
         let acked = ack_buffer.set_ack_bits(ack_sequence_number, ack_bits);
 
         for sequence_number in acked {
+            self.monitor.message_acknowledged();
             events.push(Event::MessageAcknowledged {
                 connection,
                 sequence_number,
@@ -266,10 +270,10 @@ impl Server {
         self.sequence_numbers.set(connection, 0);
         self.address_to_connection.insert(address, connection);
 
+        self.monitor.connected();
         events.push(Event::Connected {
             connection,
         });
-        self.monitor.connected();
     }
 
     fn handle_message(&mut self, connection: Connection, packet: RawPacket, events: &mut Vec<Event>) {
@@ -289,6 +293,7 @@ impl Server {
                 let acked = ack_buffer.set_ack_bits(ack_sequence_number, ack_bits);
 
                 for sequence_number in acked {
+                    self.monitor.message_acknowledged();
                     events.push(Event::MessageAcknowledged {
                         connection,
                         sequence_number,
@@ -299,11 +304,11 @@ impl Server {
                     Some(PacketType::Payload) => {
                         self.timeouts.set(connection, self.configuration.timeout);
 
+                        self.monitor.message_received();
                         events.push(Event::Message {
                             connection,
                             payload: packet.into_payload(),
                         });
-                        self.monitor.message();
                     },
                     Some(PacketType::Heartbeat) => {
                         self.timeouts.set(connection, self.configuration.timeout);

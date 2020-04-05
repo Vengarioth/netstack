@@ -11,6 +11,7 @@ use netstack::{
         ConnectionToken
     },
     packets::OutgoingPacket,
+    monitoring::EmptyClientMonitor,
 };
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -49,7 +50,9 @@ fn main() {
         heartbeat: 60,
     };
 
-    let mut client = Client::new(config, Box::new(transport));
+    let monitor = EmptyClientMonitor::new();
+
+    let mut client = Client::new(config, Box::new(transport), Box::new(monitor));
 
     let connection_info = get_connection_info();
 
